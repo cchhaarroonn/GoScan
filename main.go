@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 	"net"
-	"strconv"
 	"time"
 )
 
 func main() {
 	var address string
-	ports := [6]int{21, 22, 23, 80, 443, 25565}
+	ports := [6]string{"21", "22", "23", "80", "443", "25565"}
 	var opened int
 	var timeout int
 
@@ -19,15 +18,23 @@ func main() {
 	fmt.Scanln(&timeout)
 	fmt.Print("\n")
 
+	results := make(chan string)
+
 	for _, port := range ports {
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort(address, strconv.Itoa(port)), time.Duration(timeout)*time.Second)
-		if err != nil {
-			fmt.Printf("[X] Port %d is closed on address %s\n", port, address)
-		} else {
-			fmt.Printf("[*] Port %d is open on address %s\n", port, address)
-			opened++
-			conn.Close()
-		}
+		go func(port string) {
+			conn, err := net.DialTimeout("tcp", net.JoinHostPort(address, port), time.Duration(timeout)*time.Second)
+			if err != nil {
+				results <- fmt.Sprintf("[X] Port %s is closed on address %s\n", port, address)
+			} else {
+				results <- fmt.Sprintf("[*] Port %s is open on address %s\n", port, address)
+				conn.Close()
+			}
+		}(port)
 	}
-	fmt.Printf("[*] Scan completed. %d port(s) open.\n", opened)
+
+	for range ports {
+		fmt.Print(<-results)
+		opened++
+	}
+	fmt.Printf("\n[*] Scan completed. Found %d port(s) open.\n", opened)
 }
